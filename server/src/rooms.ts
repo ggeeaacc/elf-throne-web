@@ -164,23 +164,21 @@ export class RoomRegistry {
     this.broadcastRoom(room);
   }
 
-  /** 主机随机打乱座位顺序（非AI玩家按当前座位随机重排，AI留在原位） */
+  /** 主机随机打乱座位顺序（所有玩家包括 AI 一起参与洗牌） */
   shuffleSeats(room: Room, byPlayer: Player): void {
     if (room.hostPlayerId !== byPlayer.id) throw new RoomError('not_host', '仅主机可打乱座位');
     if (room.status !== 'lobby') throw new RoomError('already_started', '对局已开始');
     const players = [...room.players.values()];
-    const humans = players.filter((p) => !p.isAI);
-    const ais = players.filter((p) => p.isAI);
-    // 人类玩家 Fisher-Yates 洗牌
-    for (let i = humans.length - 1; i > 0; i--) {
+    // 全部玩家（含 AI）一起 Fisher-Yates 洗牌
+    for (let i = players.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      [humans[i], humans[j]] = [humans[j]!, humans[i]!];
+      [players[i], players[j]] = [players[j]!, players[i]!];
     }
-    // 重建：人类在前，AI在后
+    // 按洗牌结果重排座位号，选角数据跟随旧座位迁移
     const oldSel = { ...room.characterSelections };
     room.characterSelections = {};
     let i = 0;
-    for (const p of [...humans, ...ais]) {
+    for (const p of players) {
       const oldSeat = p.seat;
       p.seat = i;
       if (oldSel[oldSeat] !== undefined) room.characterSelections[i] = oldSel[oldSeat];

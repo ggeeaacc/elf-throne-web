@@ -4,8 +4,8 @@
  *      每回合尝试上限 + 微延迟逐步执行（真人可观战），杜绝同步递归与死循环。
  *
  * AI 决策优先级（行动阶段）：
- *   1. 本场景有危机 → 先用 Buff 卡 → 再攻击（最高伤害优先）
- *   2. HP < 50% → 治疗卡 / 精灵王国生命树 / 通用治疗
+ *   1. 本场景有危机 → 先用 Buff 卡（仅当剩余 AP 够攻击时）→ 再攻击（最高伤害优先）
+ *   2. 任意队友 HP < 50% → 治疗最残血队友（治疗卡 / 生命树 / 通用治疗）
  *   3. 本场景无危机 → 移动到有危机的场景
  *   4. 远程攻击异场景危机
  *   5. 锻造（材料 ≥ 2）
@@ -13,8 +13,8 @@
  *   7. end_turn（兜底）
  *
  * 决战阶段：
- *   1. HP < 50% → 治疗
- *   2. Buff → 攻击 Boss
+ *   1. 任意队友 HP < 50% → 治疗最残血队友
+ *   2. Buff（仅当剩余 AP 够攻击）→ 攻击 Boss
  *   3. 援护残血队友
  *   4. 净化蓄能
  *   5. 搜索（兜底抽牌）
@@ -164,6 +164,21 @@ function bestCrisisAnywhere(state: GameState): string | null {
   return best;
 }
 
+/** 找到全队 HP 比例最低的存活角色（AI 治疗目标选择用） */
+function mostWoundedAlly(state: GameState): { id: CharacterId; hpPct: number } | null {
+  let worst: { id: CharacterId; hpPct: number } | null = null;
+  let worstPct = 1;
+  for (const ch of Object.values(state.characters)) {
+    if (!ch.alive) continue;
+    const pct = ch.maxHp > 0 ? ch.hp / ch.maxHp : 0;
+    if (pct < worstPct) {
+      worstPct = pct;
+      worst = { id: ch.id, hpPct: pct };
+    }
+  }
+  return worst;
+}
+
 /** 找到全场有危机且本场景之外的场景中危机最多的 */
 function bestCrisisElsewhere(state: GameState, myScene: SceneId): string | null {
   let best: string | null = null;
@@ -221,10 +236,13 @@ export function aiActionCandidates(state: GameState, cid: CharacterId, attemptCo
     // 1. 本场景有危机 → 先用 Buff 提升输出 → 再攻击（最高伤害优先）
     //
     if (hasCrisisHere) {
-      // 1a. Buff 卡：风之加护、精灵荣光、弩炮掩护
+      // 1a. Buff 卡（仅当剩余 AP 仍足够打出一张攻击卡时才使用，避免 Buff 后无力攻击）
       for (const { uid, def } of hand) {
         if (def && isBuffCard(def) && def.costAP <= ap) {
-          out.push({ type: 'play_card', character: cid, cardUid: uid, targets: {} });
+          const canAttackAfter = attackCardsHere(hand, ap - def.costAP).length > 0;
+          if (canAttackAfter) {
+            out.push({ type: 'play_card', character: cid, cardUid: uid, targets: {} });
+          }
         }
       }
 
@@ -237,29 +255,29 @@ export function aiActionCandidates(state: GameState, cid: CharacterId, attemptCo
     }
 
     //
-    // 2. HP < 50% → 治疗
+    // 2. 任意队友 HP < 50% → 治疗最残血队友（而非只奶自己）
     //
-    if (hpPct < 0.5) {
+    const wounded = mostWoundedAlly(state);
+    if (wounded && wounded.hpPct < 0.5) {
+      const healTarget = wounded.id;
       // 2a. 治疗标签卡（雅-04 治愈之矢 / 鱼-06 意志抵抗）
       for (const { uid, def } of hand) {
         if (def && isHealCard(def) && def.costAP <= ap) {
-          // 分两种：自愈（无需目标）和指定目标（雅-04 可奶任意）
           out.push({ type: 'play_card', character: cid, cardUid: uid, targets: {} });
-          out.push({ type: 'play_card', character: cid, cardUid: uid, targets: { characters: [cid] } });
+          out.push({ type: 'play_card', character: cid, cardUid: uid, targets: { characters: [healTarget] } });
         }
       }
 
       // 2b. 精灵王国生命树场景行动（1 AP）
       if (ch.scene === 'elf_kingdom' && ap >= 1) {
-        out.push({ type: 'scene_action', character: cid, action: 'tree_heal', params: { target: cid } });
+        out.push({ type: 'scene_action', character: cid, action: 'tree_heal', params: { target: healTarget } });
       }
 
       // 2c. 通用治疗（弃一张手牌回血）
       if (ap >= 1 && ch.hand.length > 0) {
-        // 优先弃材料卡（不心疼），其次弃第一张
         const matCard = hand.find((h) => h.def?.material);
         const discard = matCard?.uid ?? ch.hand[0]!;
-        out.push({ type: 'heal', character: cid, discardUid: discard, target: cid });
+        out.push({ type: 'heal', character: cid, discardUid: discard, target: healTarget });
       }
     }
 
@@ -327,30 +345,38 @@ export function aiActionCandidates(state: GameState, cid: CharacterId, attemptCo
   // ═══════════════════════════════════════════════════════════════
   } else {
     //
-    // 1. HP < 50% → 治疗（保命优先）
+    // 1. 任意队友 HP < 50% → 治疗最残血队友（保命优先）
     //
-    if (hpPct < 0.5) {
+    const woundedB = mostWoundedAlly(state);
+    if (woundedB && woundedB.hpPct < 0.5) {
+      const healTarget = woundedB.id;
       for (const { uid, def } of hand) {
         if (def && isHealCard(def) && def.costAP <= ap) {
           out.push({ type: 'play_card', character: cid, cardUid: uid, targets: {} });
-          out.push({ type: 'play_card', character: cid, cardUid: uid, targets: { characters: [cid] } });
+          out.push({ type: 'play_card', character: cid, cardUid: uid, targets: { characters: [healTarget] } });
         }
       }
       if (ch.scene === 'elf_kingdom' && ap >= 1) {
-        out.push({ type: 'scene_action', character: cid, action: 'tree_heal', params: { target: cid } });
+        out.push({ type: 'scene_action', character: cid, action: 'tree_heal', params: { target: healTarget } });
       }
       if (ap >= 1 && ch.hand.length > 0) {
         const matCard = hand.find((h) => h.def?.material);
-        out.push({ type: 'heal', character: cid, discardUid: matCard?.uid ?? ch.hand[0]!, target: cid });
+        out.push({ type: 'heal', character: cid, discardUid: matCard?.uid ?? ch.hand[0]!, target: healTarget });
       }
     }
 
     //
-    // 2. Buff 后全力输出 Boss
+    // 2. Buff 后全力输出 Boss（仅当剩余 AP 够攻击时才 Buff）
     //
     for (const { uid, def } of hand) {
       if (def && isBuffCard(def) && def.costAP <= ap) {
-        out.push({ type: 'play_card', character: cid, cardUid: uid, targets: {} });
+        const remainingAP = ap - def.costAP;
+        const canAttackAfter = hand.some(
+          (h) => h.def && h.def.tags.includes('attack') && h.def.costAP <= remainingAP,
+        );
+        if (canAttackAfter) {
+          out.push({ type: 'play_card', character: cid, cardUid: uid, targets: {} });
+        }
       }
     }
 
