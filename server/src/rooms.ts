@@ -164,6 +164,31 @@ export class RoomRegistry {
     this.broadcastRoom(room);
   }
 
+  /** 主机随机打乱座位顺序（非AI玩家按当前座位随机重排，AI留在原位） */
+  shuffleSeats(room: Room, byPlayer: Player): void {
+    if (room.hostPlayerId !== byPlayer.id) throw new RoomError('not_host', '仅主机可打乱座位');
+    if (room.status !== 'lobby') throw new RoomError('already_started', '对局已开始');
+    const players = [...room.players.values()];
+    const humans = players.filter((p) => !p.isAI);
+    const ais = players.filter((p) => p.isAI);
+    // 人类玩家 Fisher-Yates 洗牌
+    for (let i = humans.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [humans[i], humans[j]] = [humans[j]!, humans[i]!];
+    }
+    // 重建：人类在前，AI在后
+    const oldSel = { ...room.characterSelections };
+    room.characterSelections = {};
+    let i = 0;
+    for (const p of [...humans, ...ais]) {
+      const oldSeat = p.seat;
+      p.seat = i;
+      if (oldSel[oldSeat] !== undefined) room.characterSelections[i] = oldSel[oldSeat];
+      i++;
+    }
+    this.broadcastRoom(room);
+  }
+
   /** 广播 AI 动作日志行（客户端按 l-ai 着色显示） */
   broadcastLog(room: Room, text: string): void {
     const msg = { op: 'log', text };
@@ -186,7 +211,10 @@ export class RoomRegistry {
 
     // 构建座位→角色映射
     const seatAssignments: Record<number, CharacterId[]> = {};
-    if (hasSelections) {
+    if (playerCount === 1) {
+      // 1P 模式：座0 控制全部角色，无视选角（单人无法拆分控制）
+      seatAssignments[0] = [...characters];
+    } else if (hasSelections) {
       // 有人选了角色：优先用选择，但需校验角色在当前激活池内（3P 弃角可能导致 AI 预选角色不在池中）
       const used = new Set<CharacterId>();
       // 第一轮：收集有效选择
@@ -207,8 +235,6 @@ export class RoomRegistry {
           remIdx++;
         }
       }
-    } else if (playerCount === 1) {
-      seatAssignments[0] = [...characters];
     } else {
       characters.forEach((cid, i) => {
         seatAssignments[i] = [cid];

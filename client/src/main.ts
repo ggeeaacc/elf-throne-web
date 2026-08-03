@@ -168,6 +168,7 @@ function handle(msg: ServerMessage): void {
       const canStart = lobby && iHost;
       $('startRow').style.display = canStart ? '' : 'none';
       $('addAi').style.display = canStart && r.players.length < 4 ? '' : 'none';
+      $('shuffleSeats').style.display = canStart && r.players.length > 1 ? '' : 'none';
       // 弃角选择器仅在 3 人局时显示
       const benchEl = $('bench') as HTMLElement | null;
       if (benchEl) benchEl.style.display = r.players.length === 3 ? '' : 'none';
@@ -297,7 +298,7 @@ function crisisChip(uid: string, selectable: boolean): string {
 
 function renderScenes(): void {
   const v = view!;
-  const selectable = pending.kind === 'play_card' || pending.kind === 'bond_active';
+  const selectable = (pending.kind === 'play_card' && !(pending.cardUid && needsChar(pending.cardUid))) || pending.kind === 'bond_active';
   // 移动编排：相邻高亮（绿）/ 非相邻置灰 / 当前场景虚线标记；邻接表来自引擎 SCENES.adjacent
   const moving = pending.kind === 'scene_action';
   const curCid = v.currentTurn?.character;
@@ -615,14 +616,17 @@ function renderPendingComposer(box: HTMLElement, cur: string): void {
   }
   box.appendChild(info);
 
-  // 角色选择（同伴/任意角色）
-  const needChar = ['bond_active', 'equipment_active', 'guard', 'transfer_material', 'heal'].includes(p.kind ?? '');
+  // 角色选择（同伴/任意角色）——支援卡打出时也需选目标
+  const playCardNeedsChar = p.kind === 'play_card' && p.cardUid && needsChar(p.cardUid);
+  const needChar = ['bond_active', 'equipment_active', 'guard', 'transfer_material', 'heal'].includes(p.kind ?? '') || playCardNeedsChar;
   if (needChar) {
     const row = document.createElement('div');
     row.innerHTML = '<span class="dim">选角色：</span>';
     for (const cid of v.turnOrder) {
       const c = v.characters[cid];
       if (!c?.alive) continue;
+      // 支援卡排除自身（不能对自己用）
+      if (playCardNeedsChar && cid === cur) continue;
       const b = document.createElement('button');
       b.textContent = charName(cid);
       b.className = p.characters.includes(cid) ? 'sel' : '';
@@ -776,10 +780,16 @@ function needsScene(cardUid: string): boolean {
   return ['yu-03', 'yu-07', 'ya-02', 'ya-10', 'kai-03', 'ba-08'].includes(defId);
 }
 
+/** 支援卡需要选友方角色目标（公爵之令/风之加护/战术转移 等） */
+function needsChar(cardUid: string): boolean {
+  const defId = view!.cards[cardUid]?.defId ?? '';
+  return ['kai-01', 'ya-07', 'kai-03'].includes(defId);
+}
+
 function pendingLabel(p: PendingAction): string {
   switch (p.kind) {
     case 'play_card':
-      return `打出「${cardDef(p.cardUid!).name}」（在版图上点选危机目标）`;
+      return needsChar(p.cardUid!) ? `打出「${cardDef(p.cardUid!).name}」（选角色目标）` : `打出「${cardDef(p.cardUid!).name}」（在版图上点选危机目标）`;
     case 'forge':
       return '锻造：手牌区选材料卡 + 下方选装备';
     case 'send_letter':
@@ -1115,4 +1125,5 @@ $('rejoin').onclick = () =>
   });
 $('start').onclick = () => send({ op: 'start', benchCharacter: ($('bench') as HTMLSelectElement).value });
 $('addAi').onclick = () => send({ op: 'add_ai' });
+$('shuffleSeats').onclick = () => send({ op: 'shuffle_seats' });
 ($('roomId') as HTMLInputElement).value = localStorage.getItem('elf-room') ?? '';

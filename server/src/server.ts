@@ -183,6 +183,11 @@ function dispatch(
       registry.lockCharacter(binding.room, binding.player, msg.character);
       return;
     }
+    case 'shuffle_seats': {
+      const binding = mustBind(bindings, ws);
+      registry.shuffleSeats(binding.room, binding.player);
+      return;
+    }
     case 'cmd': {
       const binding = mustBind(bindings, ws);
       registry.handleCommand(binding.room, binding.player, msg.cmd);

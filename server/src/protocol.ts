@@ -13,6 +13,7 @@ export type ClientMessage =
   | { op: 'remove_ai'; seat: number }
   | { op: 'cmd'; cmd: Command }
   | { op: 'lock_character'; character: CharacterId }
+  | { op: 'shuffle_seats' }
   | { op: 'ping' };
 
 // ── S → C ──
