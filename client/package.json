@@ -1,0 +1,11 @@
+{
+  "name": "@elf-throne/client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "极简测试客户端（无框架，美术零要求）",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  }
+}

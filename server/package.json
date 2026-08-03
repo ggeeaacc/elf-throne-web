@@ -1,0 +1,22 @@
+{
+  "name": "@elf-throne/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "房间制联机服务端：服务端权威，WebSocket + 个性化视图广播",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@elf-throne/engine": "*",
+    "ws": "^8.18.0"
+  }
+}

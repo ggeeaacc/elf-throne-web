@@ -1,0 +1,29 @@
+{
+  "name": "elf-throne-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "《精灵王座：破晓之契》合作桌游联机网页测试版",
+  "workspaces": [
+    "engine",
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace @elf-throne/engine && npm run build --workspace @elf-throne/server && npm run build --workspace @elf-throne/client",
+    "build:engine": "npm run build --workspace @elf-throne/engine",
+    "start": "npm run build && node server/dist/index.js",
+    "test": "vitest run",
+    "smoke": "npm run build && node scripts/smoke.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/ws": "^8.5.13",
+    "typescript": "^5.6.3",
+    "vite": "^6.0.7",
+    "vitest": "^3.0.5"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}
