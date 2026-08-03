@@ -106,12 +106,24 @@ export function createInitialState(config: GameConfig): GameState {
     }
   }
 
+  // 回合顺序：按座位顺时针排列（非固定角色ID顺序），使选角不影响行动顺序
+  const turnOrder: CharacterId[] = [];
+  for (let seat = 0; seat < config.playerCount; seat++) {
+    for (const c of config.seatAssignments[seat] ?? []) {
+      if (active.includes(c) && !turnOrder.includes(c)) turnOrder.push(c);
+    }
+  }
+  // 安全兜底：未被 seatAssignments 覆盖的激活角色追加到末尾（防御性，正常不触发）
+  for (const c of active) {
+    if (!turnOrder.includes(c)) turnOrder.push(c);
+  }
+
   const state: GameState = {
     schemaVersion: 1,
     config,
     rng: { seed: config.seed, cursor: rng.cursor() },
     phase: { kind: 'crisis', day: 1, segment: 'dawn', round: 1 },
-    turnOrder: TURN_ORDER_FULL.filter((c) => active.includes(c)),
+    turnOrder,
     turnPointer: 0,
     characters,
     scenes,

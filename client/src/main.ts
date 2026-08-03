@@ -996,8 +996,13 @@ function fmtEvent(ev: { kind: string }): string {
   switch (ev.kind) {
     case 'phase_entered':
       return `▶ ${PHASE_NAMES[e['phase'] as string] ?? e['phase']}`;
-    case 'card_drawn':
-      return `＋ ${charName(e['character'] as string)} 抽牌`;
+    case 'card_drawn': {
+      const defId = e['cardDefId'] as string;
+      const d = defId ? defOf(defId) : undefined;
+      return d
+        ? `＋ ${charName(e['character'] as string)} 抽到「${d.name}」`
+        : `＋ ${charName(e['character'] as string)} 抽牌`;
+    }
     case 'deck_reshuffled':
       return `↻ ${charName(e['character'] as string)} 弃牌堆洗回牌库`;
     case 'crisis_deck_reshuffled':
