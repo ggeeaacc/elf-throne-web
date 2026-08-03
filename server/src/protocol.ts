@@ -18,6 +18,7 @@ export type ClientMessage =
 
 // ── S → C ──
 export interface PlayerSnapshot {
+  playerId: string;
   seat: number;
   name: string;
   connected: boolean;

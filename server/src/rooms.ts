@@ -287,6 +287,7 @@ export class RoomRegistry {
       status: room.status,
       playerCount: room.status === 'lobby' ? null : ((room.state?.config.playerCount ?? null) as PlayerCount | null),
       players: [...room.players.values()].map((p) => ({
+        playerId: p.id,
         seat: p.seat,
         name: p.name,
         connected: p.connected,

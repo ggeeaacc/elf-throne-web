@@ -19,7 +19,7 @@ type Command = Record<string, unknown> & { type: string };
 interface RoomSnapshot {
   id: string;
   status: 'lobby' | 'playing' | 'finished';
-  players: Array<{ seat: number; name: string; connected: boolean; host: boolean; ai?: boolean; character: string | null }>;
+  players: Array<{ playerId: string; seat: number; name: string; connected: boolean; host: boolean; ai?: boolean; character: string | null }>;
   characterSelections: Record<number, string>;
 }
 
@@ -78,6 +78,7 @@ interface CharView {
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 let ws: WebSocket | null = null;
 let mySeat = -1;
+let myPlayerId = '';
 let lastSeq = 0;
 let view: GameView | null = null;
 
@@ -128,6 +129,7 @@ function handle(msg: ServerMessage): void {
   switch (msg.op) {
     case 'hello':
       mySeat = msg.seat;
+      myPlayerId = msg.playerId;
       localStorage.setItem('elf-room', msg.roomId);
       localStorage.setItem('elf-token', msg.token);
       $('roomInfo').textContent = `房间 ${msg.roomId} · 座位 ${msg.seat}`;
@@ -135,7 +137,13 @@ function handle(msg: ServerMessage): void {
       break;
     case 'room': {
       const r = msg.room;
-      const iHost = r.players.some((p) => p.host && p.seat === mySeat);
+      // 从玩家列表更新我的座位（随机座位后可能已变化）
+      const me = r.players.find((p) => p.playerId === myPlayerId);
+      if (me && me.seat !== mySeat) {
+        mySeat = me.seat;
+        $('roomInfo').textContent = `房间 ${r.id} · 座位 ${mySeat}`;
+      }
+      const iHost = r.players.some((p) => p.host && p.playerId === myPlayerId);
       const lobby = r.status === 'lobby';
       const allChars = ['xiaoyu', 'liya', 'kaier', 'baye'] as const;
       const charNames: Record<string, string> = { xiaoyu: '小鱼', liya: '莉雅', kaier: '凯尔', baye: '巴爷' };
