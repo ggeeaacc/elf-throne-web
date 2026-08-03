@@ -91,6 +91,12 @@
       .boss { border-color: #7a3a5a; background: #241722; }
       .hpbar { color: #ff7a7a; } .ap { color: #7aff9a; } .tok { color: #c9c9c9; font-size: 12px; }
       table.state td { padding: 1px 6px; vertical-align: top; }
+      /* 四阶段进度条 */
+      .phase-bar { font-size: 12px; margin-bottom: 4px; padding: 4px 8px; background: rgba(24,32,20,.6); border-radius: 4px; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+      .phase-step { padding: 1px 8px; border-radius: 10px; }
+      .phase-now { background: rgba(226,196,124,.25); color: var(--gold); font-weight: 700; }
+      .phase-done { color: #5a6a4a; text-decoration: line-through; }
+      .phase-next { color: #3a4a30; }
       /* 背景音乐播放器 */
       #bgmBtn { position: fixed; top: 12px; right: 14px; z-index: 200; display: flex; align-items: center; gap: 6px; background: rgba(20,30,18,.85); border: 1px solid var(--gold-dim); border-radius: 20px; padding: 4px 12px 4px 8px; cursor: pointer; font-size: 13px; color: var(--parch); transition: border-color .2s; }
       #bgmBtn:hover { border-color: var(--gold); }

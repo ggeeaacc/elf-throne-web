@@ -278,7 +278,19 @@ function renderStatus(): void {
   const v = view!;
   const phaseTxt = v.phase.kind === 'final_battle' ? `最终决战 第${v.boss?.round ?? 1}轮` : `第${v.phase.day}天·${SEG_NAMES[v.phase.segment]}（第${v.phase.round}轮）·${PHASE_NAMES[v.phase.kind]}`;
   const turn = v.currentTurn ? `当前回合：<b>${charName(v.currentTurn.character)}</b>${v.controlledCharacters.includes(v.currentTurn.character) ? '（你）' : ''} <span class="ap">AP ${v.characters[v.currentTurn.character]?.ap ?? 0}</span>` : '—';
-  $('status').innerHTML = `${phaseTxt} ｜ ${turn} ｜ <span class="dim">危机牌库 ${v.decks.crisisCount} ｜ 弃牌 ${v.decks.crisisDiscard.length}</span>${
+
+  // 四阶段进度条（决战/终局隐藏）
+  const phaseOrder = ['crisis', 'action', 'prejudice', 'recovery'] as const;
+  const inBattle = v.phase.kind === 'final_battle' || v.phase.kind === 'game_over';
+  const phaseBar = inBattle ? '' : `<div class="phase-bar">${phaseOrder.map((k, i) => {
+    const name = PHASE_NAMES[k];
+    const active = v.phase.kind === k;
+    const passed = phaseOrder.indexOf(v.phase.kind as typeof phaseOrder[number]) > i;
+    const cls = active ? 'phase-now' : passed ? 'phase-done' : 'phase-next';
+    return `<span class="phase-step ${cls}">${i + 1}. ${name}</span>`;
+  }).join(' ▶ ')}</div>`;
+
+  $('status').innerHTML = `${phaseBar}${phaseTxt} ｜ ${turn} ｜ <span class="dim">危机牌库 ${v.decks.crisisCount} ｜ 弃牌 ${v.decks.crisisDiscard.length}</span>${
     v.result ? ` ｜ <b>${v.result.outcome === 'victory' ? '✨胜利' : '💀失败'}：${v.result.reason}</b>` : ''
   }`;
   // 「你的回合」横幅：仅当前回合角色归本座控制且对局未结束时显示
@@ -767,6 +779,25 @@ function renderPendingComposer(box: HTMLElement, cur: string): void {
     box.appendChild(row);
   }
 
+  // 打出卡牌需要选装备展示区（巴-07 战地抢修）
+  if (p.kind === 'play_card' && p.cardUid && needsEquip(p.cardUid)) {
+    const row = document.createElement('div');
+    row.innerHTML = '<span class="dim">选装备（下次锻造 -1/-1）：</span>';
+    for (const uid of view!.equipmentDisplay) {
+      const b = document.createElement('button');
+      const cd = cardDef(uid);
+      b.textContent = cd.name;
+      b.title = cd.text ?? '';
+      b.className = p.cardUids.includes(uid) ? 'sel' : '';
+      b.onclick = () => {
+        p.cardUids = [uid];
+        render();
+      };
+      row.appendChild(b);
+    }
+    box.appendChild(row);
+  }
+
   // 提交 / 取消
   const submit = document.createElement('button');
   submit.textContent = '✔ 提交';
@@ -802,9 +833,16 @@ function needsCharExcludeSelf(cardUid: string): boolean {
   return ['kai-03', 'kai-07'].includes(defId);
 }
 
+/** 打出时需要选装备展示区卡牌（巴-07 战地抢修） */
+function needsEquip(cardUid: string): boolean {
+  const defId = view!.cards[cardUid]?.defId ?? '';
+  return ['ba-07'].includes(defId);
+}
+
 function pendingLabel(p: PendingAction): string {
   switch (p.kind) {
     case 'play_card':
+      if (needsEquip(p.cardUid!)) return `打出「${cardDef(p.cardUid!).name}」（在版图上点选危机 + 选装备）`;
       return needsChar(p.cardUid!) ? `打出「${cardDef(p.cardUid!).name}」（选角色目标）` : `打出「${cardDef(p.cardUid!).name}」（在版图上点选危机目标）`;
     case 'forge':
       return '锻造：手牌区选材料卡 + 下方选装备';

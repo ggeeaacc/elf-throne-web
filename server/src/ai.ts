@@ -5,8 +5,8 @@
  *
  * AI 决策优先级（行动阶段）：
  *   1. 本场景有危机 → 先用 Buff 卡（仅当剩余 AP 够攻击时）→ 再攻击（最高伤害优先）
- *   2. 任意队友 HP < 50% → 治疗最残血队友（治疗卡 / 生命树 / 通用治疗）
- *   3. 本场景无危机 → 移动到有危机的场景
+ *   2. 主动移动到危机更多的相邻场景（本场景无危机，或相邻场景比本地多 ≥2 且有余裕 AP）
+ *   3. 任意队友 HP < 50% → 治疗最残血队友（治疗卡 / 生命树 / 通用治疗）
  *   4. 远程攻击异场景危机
  *   5. 锻造（材料 ≥ 2）
  *   6. 搜索（每回合最多 1 次）
@@ -116,6 +116,14 @@ function attackCardsHere(hand: HandEntry[], ap: number): HandEntry[] {
   return hand
     .filter((h) => h.def && h.def.tags.includes('attack') && h.def.remote !== true && h.def.costAP <= ap)
     .sort((a, b) => estimatedDamage(b.def!) - estimatedDamage(a.def!));
+}
+
+/** 给攻击卡补充装备选择（巴-07 战地抢修需要指定展示区装备） */
+function withEquipTarget(targets: Record<string, unknown>, defId: string | undefined, state: GameState): Record<string, unknown> {
+  if (defId === 'ba-07' && state.equipmentDisplay.length > 0) {
+    return { ...targets, cardUids: [state.equipmentDisplay[0]!] };
+  }
+  return targets;
 }
 
 /** 可打出的远程攻击卡 */
@@ -248,48 +256,24 @@ export function aiActionCandidates(state: GameState, cid: CharacterId, attemptCo
 
       // 1b. 攻击卡（近战，打当前场景危机）
       if (bestHere) {
-        for (const { uid } of attackCardsHere(hand, ap)) {
-          out.push({ type: 'play_card', character: cid, cardUid: uid, targets: { crisisUids: [bestHere] } });
+        for (const h of attackCardsHere(hand, ap)) {
+          out.push({ type: 'play_card', character: cid, cardUid: h.uid, targets: withEquipTarget({ crisisUids: [bestHere] }, h.def?.id, state) });
         }
       }
     }
 
     //
-    // 2. 任意队友 HP < 50% → 治疗最残血队友（而非只奶自己）
+    // 2. 主动移动：本场景无危机 OR 相邻场景危机更多（至少多2张才值得跑一趟）
     //
-    const wounded = mostWoundedAlly(state);
-    if (wounded && wounded.hpPct < 0.5) {
-      const healTarget = wounded.id;
-      // 2a. 治疗标签卡（雅-04 治愈之矢 / 鱼-06 意志抵抗）
-      for (const { uid, def } of hand) {
-        if (def && isHealCard(def) && def.costAP <= ap) {
-          out.push({ type: 'play_card', character: cid, cardUid: uid, targets: {} });
-          out.push({ type: 'play_card', character: cid, cardUid: uid, targets: { characters: [healTarget] } });
-        }
-      }
-
-      // 2b. 精灵王国生命树场景行动（1 AP）
-      if (ch.scene === 'elf_kingdom' && ap >= 1) {
-        out.push({ type: 'scene_action', character: cid, action: 'tree_heal', params: { target: healTarget } });
-      }
-
-      // 2c. 通用治疗（弃一张手牌回血）
-      if (ap >= 1 && ch.hand.length > 0) {
-        const matCard = hand.find((h) => h.def?.material);
-        const discard = matCard?.uid ?? ch.hand[0]!;
-        out.push({ type: 'heal', character: cid, discardUid: discard, target: healTarget });
-      }
-    }
-
-    //
-    // 3. 本场景无危机 → 移动到有危机的场景
-    //
-    if (!hasCrisisHere && ap >= 1) {
-      const crisisScenes = (SCENES[ch.scene]?.adjacent ?? [])
-        .filter((s) => (state.scenes[s]?.crisisCards.length ?? 0) > 0)
-        .sort((a, b) => (state.scenes[b]?.crisisCards.length ?? 0) - (state.scenes[a]?.crisisCards.length ?? 0));
-
-      // 3a. 移动卡（有 move tag）
+    const crisisScenes = (SCENES[ch.scene]?.adjacent ?? [])
+      .filter((s) => (state.scenes[s]?.crisisCards.length ?? 0) > 0)
+      .sort((a, b) => (state.scenes[b]?.crisisCards.length ?? 0) - (state.scenes[a]?.crisisCards.length ?? 0));
+    const bestOtherCount = crisisScenes.length > 0 ? (state.scenes[crisisScenes[0]!]?.crisisCards.length ?? 0) : 0;
+    const localCount = scene?.crisisCards.length ?? 0;
+    // 移动条件：本地无危机；或相邻场景比本地多 ≥2 且还有 AP 去打仗
+    const shouldMove = (!hasCrisisHere || (bestOtherCount >= localCount + 2 && ap >= 2)) && ap >= 1;
+    if (shouldMove) {
+      // 2a. 移动卡（有 move tag）
       for (const { uid, def } of hand) {
         if (def && def.tags.includes('move') && def.costAP <= ap) {
           for (const to of crisisScenes) {
@@ -300,9 +284,36 @@ export function aiActionCandidates(state: GameState, cid: CharacterId, attemptCo
         }
       }
 
-      // 3b. 基础移动（1 AP，相邻场景）
+      // 2b. 基础移动（1 AP，相邻场景）
       for (const to of crisisScenes) {
         out.push({ type: 'move', character: cid, to });
+      }
+    }
+
+    //
+    // 3. 任意队友 HP < 50% → 治疗最残血队友（而非只奶自己）
+    //
+    const wounded = mostWoundedAlly(state);
+    if (wounded && wounded.hpPct < 0.5) {
+      const healTarget = wounded.id;
+      // 3a. 治疗标签卡（雅-04 治愈之矢 / 鱼-06 意志抵抗）
+      for (const { uid, def } of hand) {
+        if (def && isHealCard(def) && def.costAP <= ap) {
+          out.push({ type: 'play_card', character: cid, cardUid: uid, targets: {} });
+          out.push({ type: 'play_card', character: cid, cardUid: uid, targets: { characters: [healTarget] } });
+        }
+      }
+
+      // 3b. 精灵王国生命树场景行动（1 AP）
+      if (ch.scene === 'elf_kingdom' && ap >= 1) {
+        out.push({ type: 'scene_action', character: cid, action: 'tree_heal', params: { target: healTarget } });
+      }
+
+      // 3c. 通用治疗（弃一张手牌回血）
+      if (ap >= 1 && ch.hand.length > 0) {
+        const matCard = hand.find((h) => h.def?.material);
+        const discard = matCard?.uid ?? ch.hand[0]!;
+        out.push({ type: 'heal', character: cid, discardUid: discard, target: healTarget });
       }
     }
 
@@ -311,8 +322,8 @@ export function aiActionCandidates(state: GameState, cid: CharacterId, attemptCo
     //
     const farCrisis = bestCrisisElsewhere(state, ch.scene);
     if (farCrisis) {
-      for (const { uid } of attackCardsRemote(hand, ap)) {
-        out.push({ type: 'play_card', character: cid, cardUid: uid, targets: { crisisUids: [farCrisis] } });
+      for (const h of attackCardsRemote(hand, ap)) {
+        out.push({ type: 'play_card', character: cid, cardUid: h.uid, targets: withEquipTarget({ crisisUids: [farCrisis] }, h.def?.id, state) });
       }
     }
 
@@ -383,8 +394,8 @@ export function aiActionCandidates(state: GameState, cid: CharacterId, attemptCo
     const bossAttacks = hand
       .filter((h) => h.def && h.def.tags.includes('attack') && h.def.costAP <= ap)
       .sort((a, b) => estimatedDamage(b.def!) - estimatedDamage(a.def!));
-    for (const { uid } of bossAttacks) {
-      out.push({ type: 'play_card', character: cid, cardUid: uid, targets: {} });
+    for (const h of bossAttacks) {
+      out.push({ type: 'play_card', character: cid, cardUid: h.uid, targets: withEquipTarget({}, h.def?.id, state) });
     }
 
     //
