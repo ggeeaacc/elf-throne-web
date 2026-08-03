@@ -324,8 +324,11 @@ const ya: Record<string, Handler> = {
     if (ctx.inBattle) return attackOnBoss(ctx, { base: 2 });
     const uids = (ctx.targets.crisisUids ?? []).slice(0, 2);
     if (uids.length === 0) throw new EngineError('invalid_target', '至多选择 2 张危机卡');
+    // 精灵神射被动：莉雅的攻击卡可指定相邻场景的危机卡
+    const validScenes = new Set([ch(ctx).scene, ...adj(ctx)]);
     for (const uid of uids) {
-      if (crisisSceneOf(ctx.state, uid) !== ch(ctx).scene) throw new EngineError('invalid_target', '箭雨限当前场景');
+      const sc = crisisSceneOf(ctx.state, uid);
+      if (!sc || !validScenes.has(sc)) throw new EngineError('invalid_target', '危机卡须在当前或相邻场景');
     }
     attackMulti(ctx, { base: 2, uids });
   },

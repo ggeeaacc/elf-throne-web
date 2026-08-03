@@ -22,7 +22,7 @@ export const ACTION_CARDS: ActionCardDef[] = [
   { id: 'ya-03', code: '雅-03', name: '精灵地图', character: 'liya', tags: ['support'], material: false, costAP: 1, remote: false, text: '查看危机牌库顶三张卡，按任意顺序放回。如果其中有黑暗标记【暗】的卡，将其置于牌库底。' },
   { id: 'ya-04', code: '雅-04', name: '治愈之矢', character: 'liya', tags: ['heal'], material: false, costAP: 1, remote: false, text: '恢复任意一名角色2点生命值。如果目标为小鱼且小鱼处于失控状态，额外移除一个黑色侵蚀指示物。' },
   { id: 'ya-05', code: '雅-05', name: '生命宝玉', character: 'liya', tags: ['special'], material: false, costAP: 1, remote: false, text: '仅当与小鱼处于同一场景且小鱼拥有至少一个黑色侵蚀指示物时可打出。清空小鱼所有黑色侵蚀指示物，恢复小鱼至满生命值。自身永久扣除1点生命值上限。本效果一局最多使用两次。' },
-  { id: 'ya-06', code: '雅-06', name: '箭雨', character: 'liya', tags: ['attack'], material: false, costAP: 1, remote: false, text: '对当前场景至多2张危机卡各造成2点伤害。' },
+  { id: 'ya-06', code: '雅-06', name: '箭雨', character: 'liya', tags: ['attack'], material: false, costAP: 1, remote: 'conditional', text: '对当前或相邻场景至多2张危机卡各造成2点伤害。（精灵神射被动）' },
   { id: 'ya-07', code: '雅-07', name: '风之加护', character: 'liya', tags: ['support'], material: false, costAP: 1, remote: false, text: '本轮内，指定一名同场景的友方角色，其下一次攻击伤害+2。' },
   { id: 'ya-08', code: '雅-08', name: '精灵誓约', character: 'liya', tags: ['support'], material: false, costAP: 1, remote: false, text: '仅当与小鱼同处一地时可打出。双方各抽一张牌，且小鱼获得1点额外行动点（仅限小鱼的下一个回合使用，不可累积）。' },
   { id: 'ya-09', code: '雅-09', name: '追踪箭', character: 'liya', tags: ['attack'], material: false, costAP: 1, remote: true, text: '对任意场景的一张危机卡造成3点伤害。' },

@@ -633,8 +633,8 @@ function renderPendingComposer(box: HTMLElement, cur: string): void {
     for (const cid of v.turnOrder) {
       const c = v.characters[cid];
       if (!c?.alive) continue;
-      // 支援卡排除自身（不能对自己用）
-      if (playCardNeedsChar && cid === cur) continue;
+      // 支援卡排除自身（仅对不能自用的卡：战术转移/护卫誓言）
+      if (playCardNeedsChar && needsCharExcludeSelf(p.cardUid!) && cid === cur) continue;
       const b = document.createElement('button');
       b.textContent = charName(cid);
       b.className = p.characters.includes(cid) ? 'sel' : '';
@@ -788,10 +788,16 @@ function needsScene(cardUid: string): boolean {
   return ['yu-03', 'yu-07', 'ya-02', 'ya-10', 'kai-03', 'ba-08'].includes(defId);
 }
 
-/** 支援卡需要选友方角色目标（公爵之令/风之加护/战术转移 等） */
+/** 支援卡需要选友方角色目标（治愈之矢/风之加护/公爵之令/战术转移/护卫誓言 等） */
 function needsChar(cardUid: string): boolean {
   const defId = view!.cards[cardUid]?.defId ?? '';
-  return ['kai-01', 'ya-07', 'kai-03'].includes(defId);
+  return ['ya-04', 'ya-07', 'kai-01', 'kai-03', 'kai-07'].includes(defId);
+}
+
+/** 需要排除自身的角色目标卡（战术转移/护卫誓言 不能对自己用） */
+function needsCharExcludeSelf(cardUid: string): boolean {
+  const defId = view!.cards[cardUid]?.defId ?? '';
+  return ['kai-03', 'kai-07'].includes(defId);
 }
 
 function pendingLabel(p: PendingAction): string {
@@ -1135,3 +1141,30 @@ $('start').onclick = () => send({ op: 'start', benchCharacter: ($('bench') as HT
 $('addAi').onclick = () => send({ op: 'add_ai' });
 $('shuffleSeats').onclick = () => send({ op: 'shuffle_seats' });
 ($('roomId') as HTMLInputElement).value = localStorage.getItem('elf-room') ?? '';
+
+// ── 背景音乐播放器 ────────────────────────────────────────────────────────────
+(() => {
+  const audio = document.getElementById('bgm') as HTMLAudioElement | null;
+  const btn = document.getElementById('bgmBtn');
+  if (!audio || !btn) return;
+  const label = btn.querySelector('.label')!;
+  audio.volume = 0.35;
+  btn.addEventListener('click', () => {
+    if (audio.paused) {
+      audio.play().then(() => {
+        btn.classList.add('playing');
+        label.textContent = '暂停音乐';
+      }).catch(() => {
+        label.textContent = '点击重试';
+      });
+    } else {
+      audio.pause();
+      btn.classList.remove('playing');
+      label.textContent = '播放音乐';
+    }
+  });
+  audio.addEventListener('error', () => {
+    label.textContent = '播放失败';
+    btn.classList.remove('playing');
+  });
+})();

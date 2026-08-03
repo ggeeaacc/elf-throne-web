@@ -91,9 +91,19 @@
       .boss { border-color: #7a3a5a; background: #241722; }
       .hpbar { color: #ff7a7a; } .ap { color: #7aff9a; } .tok { color: #c9c9c9; font-size: 12px; }
       table.state td { padding: 1px 6px; vertical-align: top; }
+      /* 背景音乐播放器 */
+      #bgmBtn { position: fixed; top: 12px; right: 14px; z-index: 200; display: flex; align-items: center; gap: 6px; background: rgba(20,30,18,.85); border: 1px solid var(--gold-dim); border-radius: 20px; padding: 4px 12px 4px 8px; cursor: pointer; font-size: 13px; color: var(--parch); transition: border-color .2s; }
+      #bgmBtn:hover { border-color: var(--gold); }
+      #bgmBtn .icon { font-size: 16px; }
+      #bgmBtn.playing .icon { animation: spin 3s linear infinite; }
+      @keyframes spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
     </style>
   </head>
   <body>
+    <audio id="bgm" loop preload="none" crossorigin="anonymous">
+      <source src="https://music.163.com/song/media/outer/url?id=417859631.mp3" type="audio/mpeg">
+    </audio>
+    <div id="bgmBtn" title="点击播放/暂停背景音乐"><span class="icon">🎵</span><span class="label">播放音乐</span></div>
     <h1>精灵王座：破晓之契 · 联机测试版</h1>
     <fieldset id="lobby">
       <legend>房间</legend>
