@@ -107,6 +107,9 @@ export class RoomRegistry {
     this.broadcastRoom(room);
   }
 
+  /** 全角色池（4P 时全员可用；3P 时 startGame 会按 bench 过滤） */
+  private static ALL_CHAR_POOL: CharacterId[] = ['xiaoyu', 'liya', 'kaier', 'baye'];
+
   /** 主机在大厅给空座位添加 AI 补位（无 ws 连接，服务端托管） */
   addAI(room: Room, byPlayer: Player): void {
     if (room.hostPlayerId !== byPlayer.id) throw new RoomError('not_host', '仅主机可添加 AI');
@@ -123,6 +126,10 @@ export class RoomRegistry {
       send: () => {},
     };
     room.players.set(player.id, player);
+    // AI 自动选角：从未被选中的角色池中取第一个
+    const taken = new Set(Object.values(room.characterSelections));
+    const auto = RoomRegistry.ALL_CHAR_POOL.find((c) => !taken.has(c));
+    if (auto) room.characterSelections[seat] = auto;
     this.broadcastRoom(room);
   }
 
@@ -134,8 +141,17 @@ export class RoomRegistry {
     if (!target) throw new RoomError('no_such_seat', '该座位不存在');
     if (!target.isAI) throw new RoomError('not_ai_seat', '只能移除 AI 座位');
     room.players.delete(target.id);
+    // 清理被移除座位的选角，并按新座位号重建映射
+    delete room.characterSelections[seat];
+    const oldSel = { ...room.characterSelections };
+    room.characterSelections = {};
     let i = 0;
-    for (const p of room.players.values()) p.seat = i++;
+    for (const p of room.players.values()) {
+      const oldSeat = p.seat;
+      p.seat = i;
+      if (oldSel[oldSeat] !== undefined) room.characterSelections[i] = oldSel[oldSeat];
+      i++;
+    }
     this.broadcastRoom(room);
   }
 
@@ -164,14 +180,32 @@ export class RoomRegistry {
     if (room.status !== 'lobby') throw new RoomError('already_started', '对局已开始');
     const playerCount = room.players.size as PlayerCount;
     const characters = activeCharactersFor(playerCount, opts.benchCharacter);
-    // 有角色选择时使用选择，否则按默认顺序
-    const seatAssignments: Record<number, CharacterId[]> = {};
+    const activeSet = new Set(characters);
     const selections = room.characterSelections;
     const hasSelections = Object.keys(selections).length > 0;
+
+    // 构建座位→角色映射
+    const seatAssignments: Record<number, CharacterId[]> = {};
     if (hasSelections) {
-      // 使用玩家选择的角色（保证无重复）
-      for (const [seat, ch] of Object.entries(selections)) {
-        seatAssignments[Number(seat)] = [ch];
+      // 有人选了角色：优先用选择，但需校验角色在当前激活池内（3P 弃角可能导致 AI 预选角色不在池中）
+      const used = new Set<CharacterId>();
+      // 第一轮：收集有效选择
+      for (let seat = 0; seat < playerCount; seat++) {
+        const sel = selections[seat];
+        if (sel && activeSet.has(sel)) {
+          seatAssignments[seat] = [sel];
+          used.add(sel);
+        }
+      }
+      // 第二轮：为缺失座位分配剩余角色
+      const remaining = characters.filter((c) => !used.has(c));
+      let remIdx = 0;
+      for (let seat = 0; seat < playerCount; seat++) {
+        if (!seatAssignments[seat]) {
+          const ch = remaining[remIdx] ?? characters[seat]!;
+          seatAssignments[seat] = [ch];
+          remIdx++;
+        }
       }
     } else if (playerCount === 1) {
       seatAssignments[0] = [...characters];

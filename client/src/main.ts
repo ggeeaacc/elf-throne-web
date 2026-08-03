@@ -168,6 +168,9 @@ function handle(msg: ServerMessage): void {
       const canStart = lobby && iHost;
       $('startRow').style.display = canStart ? '' : 'none';
       $('addAi').style.display = canStart && r.players.length < 4 ? '' : 'none';
+      // 弃角选择器仅在 3 人局时显示
+      const benchEl = $('bench') as HTMLElement | null;
+      if (benchEl) benchEl.style.display = r.players.length === 3 ? '' : 'none';
       break;
     }
     case 'view':
