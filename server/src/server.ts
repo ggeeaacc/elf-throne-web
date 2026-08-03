@@ -84,6 +84,7 @@ export async function createGameServer(opts: GameServerOptions): Promise<GameSer
         dispatch(registry, bindings, ws, send, msg);
       } catch (err) {
         const { code, message } = registry.errorOf(err);
+        console.error(`[server] error for ${msg.op}: ${code} — ${message}`, err instanceof Error ? err.stack : '');
         send({ op: 'error', code, message });
       }
     });

@@ -191,6 +191,8 @@ function handle(msg: ServerMessage): void {
       render();
       break;
     case 'error':
+      // 错误信息不应藏在游戏 div 里——开局失败前端也应可见
+      $('game').style.display = '';
       log(`✗ ${msg.code}: ${msg.message}`, 'l-err');
       break;
     case 'log':
