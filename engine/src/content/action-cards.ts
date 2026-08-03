@@ -37,7 +37,7 @@ export const ACTION_CARDS: ActionCardDef[] = [
   { id: 'kai-07', code: '凯-07', name: '护卫誓言', character: 'kaier', tags: ['defense'], material: false, costAP: 1, remote: false, text: '本轮内，指定一名同场景友方角色受到的下一次伤害由你代为承受。如果代为承受的伤害来源于带有黑暗标记的危机，你获得一个材料指示物。' },
   { id: 'kai-08', code: '凯-08', name: '破晓冲锋', character: 'kaier', tags: ['attack'], material: false, costAP: 1, remote: false, text: '对当前场景至多两张危机卡各造成2点伤害。结算后，本轮剩余行动点归零，无法再进行任何行动。' },
   { id: 'kai-09', code: '凯-09', name: '精灵荣光', character: 'kaier', tags: ['support'], material: false, costAP: 1, remote: false, text: '本轮内，你所在场景的所有友方角色攻击伤害+2。如果你已与巴爷结成羁绊，本效果额外持续至下一轮。' },
-  { id: 'kai-10', code: '凯-10', name: '为妻而战', character: 'kaier', tags: ['attack'], material: false, costAP: 1, remote: true, text: '仅当古战场废墟场景下方存在危机卡时可打出。对任意场景的一张危机卡造成4点伤害。如果古战场废墟下方已无危机卡，改为造成6点伤害。' },
+  { id: 'kai-10', code: '凯-10', name: '为妻而战', character: 'kaier', tags: ['attack'], material: false, costAP: 1, remote: true, text: '仅当古战场废墟场景下方存在危机卡时可打出。对任意场景的一张危机卡造成4点伤害。如果除古战场废墟外的其他场景均已无危机卡，改为造成6点伤害。' },
   // ── A.4 巴爷 ──
   { id: 'ba-01', code: '巴-01', name: '舰炮轰击', character: 'baye', tags: ['attack'], material: false, costAP: 1, remote: true, text: '消耗1个行动点。对任意场景的一张危机卡造成3点伤害。' },
   { id: 'ba-02', code: '巴-02', name: '侠盗直觉', character: 'baye', tags: ['resource'], material: true, costAP: 1, remote: false, text: '从个人牌库抽三张卡，选择其中两张加入手牌，剩余一张弃置，并获得1个【材】标记。本卡带有【材】标记。' },
